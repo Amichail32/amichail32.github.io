@@ -1,0 +1,16 @@
+.title {
+    font-family: 'Gideon Roman', cursive;
+}
+.parallax {
+    background-image: url(https://images.pexels.com/photos/8370752/pexels-photo-8370752.jpeg?auto=compress&cs=tinysrgb&dpr=2) ;
+     background-size: cover;
+     background-position: center;
+     background-repeat: no-repeat;
+     height: 750px;
+     width: 100vw;
+     background-attachment: fixed;
+}
+.carousel-inner {
+    height: 500px;
+    background-size: cover ;
+}
