@@ -1,0 +1,312 @@
+jQuery(function ($) {
+    const $body = $('body');
+    let adsObserver = initAdsObserver();
+    let isLoading = false;
+
+    // Init things for posts load on button click
+    $(document).on('click', '.js-load-more', function () {
+        const spinnerWrapper = $('.container .loadmore-btn-wrap');
+        const button = $(this);
+
+        if (!isLoading) {
+            isLoading = true;
+
+            jxPostsLoadmore(spinnerWrapper, button).then(function (json) {
+                if (json.hasOwnProperty('html') && json.html) {
+                    const mrecs = $(document).find('.sidebar-info.extra').last().find('.code-block');
+                    mrecs.each(function (key, ad) {
+                        adsObserver.observe(ad);
+                    });
+
+                    const native_ads = $(document).find('.main-news').last().find('.na-item');
+                    native_ads.each(function (key, ad) {
+                        adsObserver.observe(ad);
+                    });
+                }
+
+                isLoading = false;
+            });
+        }
+    });
+
+    // Init things for homepage
+    if ($body.hasClass('home')) {
+        $.get('/wp-admin/admin-ajax.php', { action: 'cb_jx_get_native_ad' }, function (html) {
+            if (html) {
+                $('.group-news .main-news-list > li:nth-child(2)').after(html);
+            }
+        }).then(function () {
+            const ad = $('.main-news-list .na-item');
+            adsObserver.observe(ad[0]);
+        });
+    }
+
+    // Init native ads tracking
+    if ($body.hasClass('category-sponsored')) {
+        const ads = $('.main-news:last-of-type .na-item');
+        ads.each(function (key, ad) {
+            adsObserver.observe(ad);
+        });
+    }
+
+    // Init things for single post load on scroll
+    if ($body.hasClass('single-post')) {
+        getPageYForSidebar();
+
+        const native_ads = $('.recommended-posts .post-item.na-item');
+        native_ads.each(function (key, ad) {
+            adsObserver.observe(ad);
+        })
+
+        if (!$body.hasClass('cb-loadmore-off')) {
+            let changeUrlObserver = initChangeUrlObserver();
+            let postViewObserver = initPostViewObserver();
+            initLoadmoreObserver(changeUrlObserver, postViewObserver, adsObserver);
+        }
+    }
+
+    // Load post(s) via ajax
+    function jxPostsLoadmore(spinnerWrapper, button, currentPost) {
+        let spinner = null;
+        if (typeof spinnerWrapper !== 'undefined') {
+            spinner = spinnerWrapper.find('.loadmore-spinner');
+        }
+
+        currentPost = currentPost || null;
+
+        const data = {
+            action: 'cb_jx_posts_loadmore',
+            cb_nonce: cb_loadmore_params.cb_nonce,
+            query_vars: cb_loadmore_params.query_vars,
+            is_single: cb_loadmore_params.is_single,
+            is_archive: cb_loadmore_params.is_archive,
+            is_author: cb_loadmore_params.is_author,
+            is_search: cb_loadmore_params.is_search,
+            is_home: cb_loadmore_params.is_home,
+            page: cb_loadmore_params.current_page,
+            queried_object_id: cb_loadmore_params.queried_object_id
+        };
+
+        if (cb_loadmore_params.is_single && currentPost) {
+            data.queried_object_id = currentPost.data('id');
+        }
+
+        return $.ajax({
+            url: cb_loadmore_params.ajaxurl,
+            data: data,
+            type: 'POST',
+            dataType: 'json',
+            beforeSend: function () {
+                if (spinner) {
+                    spinner.show();
+                }
+
+                if (typeof button !== 'undefined' && button) {
+                    button.hide();
+                }
+            },
+            success: function (json) {
+                if (spinner) {
+                    spinner.hide();
+                }
+
+                let isLastPage = false;
+                if (json.hasOwnProperty('html') && json.html) {
+                    spinnerWrapper.before(json.html);
+                    cb_loadmore_params.current_page++;
+                    formatDates($);
+
+                    isLastPage = parseInt(cb_loadmore_params.current_page) === parseInt(cb_loadmore_params.max_page);
+                }
+
+                if (typeof button !== 'undefined' && button) {
+                    if (isLastPage) {
+                        button.remove();
+                    } else {
+                        button.show();
+                    }
+                }
+            }
+        });
+    }
+
+    // Observes when to load new post via ajax (on scroll)
+    function initLoadmoreObserver(changeUrlObserver, postViewObserver, adsObserver) {
+        let loadmoreObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const spinnerWrapper = $(entry.target);
+                    const currentPost = $('.page-content-main article:last-of-type');
+
+                    if (!isLoading) {
+                        isLoading = true;
+
+                        jxPostsLoadmore(spinnerWrapper, null, currentPost).then(function(json) {
+                            if (json.hasOwnProperty('html') && json.html) {
+                                const loadedPost = $('.page-content-main article:last-of-type');
+                                const postContent = loadedPost.find('.article-content-wrapper')[0];
+
+                                changeUrlObserver.observe(postContent);
+                                postViewObserver.observe(postContent);
+
+                                const ads = loadedPost.find('.code-block, .recommended-posts .post-item.na-item');
+                                ads.each(function (key, ad) {
+                                    adsObserver.observe(ad);
+                                });
+
+                                getPageYForSidebar();
+
+                                isLoading = false;
+                            }
+                        });
+                    }
+                }
+            });
+        }, { threshold : 0.1 });
+
+        loadmoreObserver.observe($('.page-content-main .loadmore-btn-wrap')[0]);
+
+        return loadmoreObserver;
+    }
+
+    // Observes page url changes on scroll
+    function initChangeUrlObserver() {
+        let changeUrlObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const post = $(entry.target).closest('article');
+                    const url = post.data('url');
+                    const path = post.data('path');
+                    const title = post.data('title');
+
+                    // Change page url
+                    if (window.history.replaceState && url !== document.location.href) {
+                        $(document).prop('title', title);
+                        window.history.replaceState(null, title, path);
+                    }
+                }
+            });
+        });
+
+        // Initial article observer
+        changeUrlObserver.observe($('.page-content-main article .article-content-wrapper')[0]);
+
+        return changeUrlObserver;
+    }
+
+    // Observes when to count page view on the ajax-loaded article
+    function initPostViewObserver() {
+        let postViewObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const post = $(entry.target).closest('article');
+                    trackGAPostView(post.data('url'), post.data('path'), post.data('title'));
+                    trackPVCPostView(post.data('id'));
+                    postViewObserver.unobserve(entry.target);
+                }
+            });
+        });
+
+        return postViewObserver;
+    }
+
+    // Observes when to track view/click on ad banners in the ajax-loaded article
+    function initAdsObserver() {
+        let adsObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    trackAIBanner($(entry.target), false);
+                    $(entry.target).on('click', function () {
+                        trackAIBanner($(entry.target), true);
+                    });
+                    adsObserver.unobserve(entry.target);
+                }
+            });
+        });
+
+        return adsObserver;
+    }
+
+    // Tracks Google Analytics page view
+    function trackGAPostView(url, path, title) {
+        if (typeof gtag === 'function') {
+            gtag('config', 'UA-107371595-1', {
+                'page_location': `${url}?utm_source=jxLoadmoreArticle&utm_medium=cryptobriefing.com`,
+                'page_path': path,
+                'page_title': title
+            });
+        }
+    }
+
+    // Tracks WP page view
+    function trackPVCPostView(postId) {
+        $.ajax({
+            url: cb_loadmore_params.pvc_ajaxurl,
+            type: 'post',
+            async: true,
+            cache: false,
+            data: {
+                action: 'pvc-check-post',
+                pvc_nonce: cb_loadmore_params.pvc_nonce,
+                id: postId
+            }
+        }).done(function (response) {
+            // trigger pvcCheckPost event
+            $.event.trigger({
+                type: 'pvcCheckPost',
+                detail: response
+            });
+        });
+    }
+
+    // Tracks ad banner view/click
+    function trackAIBanner(banner, is_click) {
+        is_click = is_click || false;
+        if (banner.length) {
+            // Disabled because lazy load is now used for AdInserter
+            /*// AdInserter data
+            const ai_data = $(banner).attr('data-ai');
+            if (ai_data) {
+                $.post(cb_loadmore_params.ajaxurl, {
+                    action: 'cb_ai_track',
+                    block_ai: $(banner).attr('data-ai'),
+                    is_click: is_click
+                });
+            }*/
+
+            // Native ad data
+            const na_data = $(banner).attr('data-na_id');
+            if (na_data) {
+                let location = '';
+                if ($(banner).attr('data-na_location')) {
+                    location = $(banner).attr('data-na_location');
+                } else if ($('body').hasClass('home')) {
+                    location = 'home';
+                } else if ($('body').hasClass('tag')) {
+                    location = 'tag';
+                } else if ($('body').hasClass('tax-coins')) {
+                    location = 'coin';
+                } else if ($('body').hasClass('category')) {
+                    location = 'category';
+                }
+
+                $.post(cb_loadmore_params.ajaxurl, {
+                    action: 'cb_native_ad_track',
+                    native_ad_id: $(banner).attr('data-na_id'),
+                    location: location,
+                    is_click: is_click
+                });
+            }
+        }
+    }
+
+    function getPageYForSidebar() {
+        const windowHeight = $(window).height();
+
+        $.map($('.article-sidebar-items'), function (sidebarElem) {
+            const sidebarHeight = $(sidebarElem).height();
+            let result = windowHeight > sidebarHeight ? 75 : (windowHeight - sidebarHeight - 115); // 15px margin bottom
+            $(sidebarElem).css('top', `${result}px`);
+        })
+    }
+});

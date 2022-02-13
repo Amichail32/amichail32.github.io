@@ -1,0 +1,68 @@
+jQuery(function ($) {
+    // Newsletter signup form
+    $(document).on('click', '.nf-btn-submit', function (e) {
+        let $btn = $(this);
+        let $newsletter_form = $btn.closest('form');
+        const $email_field = $newsletter_form.find('[name="rwpzeuyofx"]');
+        const $hpot_field = $newsletter_form.find('[name="email"]');
+
+        $('.widget-newsletter-form .substrate', $newsletter_form).addClass('show');
+
+        let error = '';
+
+        let email = $email_field.val();
+        if (!isValidEmail(email)) {
+            error = 'Invalid email. Please try again.';
+        }
+
+        let hpot = $hpot_field.val();
+        if (hpot.length) {
+            error = 'Invalid email. Please try again.';
+        }
+
+        if (error) {
+            $('.nf-input-wrapper', $newsletter_form).addClass('has-error');
+            $('.nf-message-holder', $newsletter_form).addClass('error').text(error);
+            $('.widget-newsletter-form .substrate', $newsletter_form).removeClass('show');
+            e.preventDefault();
+            return;
+        }
+
+        const data = {
+            action: 'cb_nf_submit',
+            email: hpot,
+            rwpzeuyofx: email
+        };
+
+        $.ajax({
+            url: '/wp-admin/admin-ajax.php',
+            type: 'POST',
+            dataType: 'json',
+            data: data,
+            beforeSend: function () {
+                $('.nf-input-wrapper', $newsletter_form).removeClass('has-error');
+                $btn.attr('disabled', true);
+            },
+            success: function (json) {
+                $btn.attr('disabled', false);
+                $('.widget-newsletter-form .substrate', $newsletter_form).removeClass('show');
+
+                if (json.error) {
+                    $('.nf-message-holder', $newsletter_form).addClass('error').text(json.error);
+                } else if (json.success) {
+                    $('.nf-input-wrapper', $newsletter_form).fadeOut(100);
+                    $('.nf-button-wrapper', $newsletter_form).fadeOut(100);
+
+                    setTimeout(function () {
+                        $('.nf-message-holder', $newsletter_form).addClass('success').text(json.success);
+                    }, 200);
+                }
+            }
+        });
+    });
+
+    $('[name="rwpzeuyofx"]').on('keyup', function () {
+        $(this).closest('form').find('.nf-input-wrapper').removeClass('has-error');
+        $(this).closest('form').find('.nf-message-holder').removeClass('error success').empty();
+    })
+});
