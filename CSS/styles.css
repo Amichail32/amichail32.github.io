@@ -11,6 +11,6 @@
      background-attachment: fixed;
 }
 .carousel-inner {
-    height: 500px;
-    background-size: cover ;
+    background-size: cover;
+    object-fit: contain;
 }
