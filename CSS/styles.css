@@ -1,16 +1,55 @@
 .title {
     font-family: 'Gideon Roman', cursive;
+    padding: 50px;
+    color: royalblue
 }
 .parallax {
     background-image: url(https://images.pexels.com/photos/8370752/pexels-photo-8370752.jpeg?auto=compress&cs=tinysrgb&dpr=2) ;
      background-size: cover;
      background-position: center;
      background-repeat: no-repeat;
-     height: 750px;
+     /* height: 750px; */
      width: 100vw;
      background-attachment: fixed;
+     margin-top: auto;
 }
 .carousel-inner {
     background-size: cover;
     object-fit: contain;
+}
+.bg-dark {
+    background-color: rgba(0, 0, 0, .65)!important;
+}
+h5{
+    z-index: 1;
+    color: aqua;
+}
+.font {
+    font-family: 'Redressed', cursive;
+    color: aqua;
+}
+.why-invest{
+    background-color:black;
+}
+.myself{
+    height: 200px;
+    padding: 0%;
+    object-fit: cover;
+    height: 300;
+    width: 100;
+}
+.about-me{
+    font-size: 1.5rem;
+}
+.container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+.btn-1 {
+    width: 100px;
+    height: 50px;
+    color: aliceblue;
+    background-color: blue;
+
 }
